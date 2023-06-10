@@ -1,0 +1,78 @@
+/sol
+
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <map>
+#include <algorithm>
+#include <iomanip>
+#include <ctime>
+#include "json.hpp"
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
+
+struct Entry {
+    double amount;
+    std::time_t timestamp;
+};
+
+void generate_balance_sheet(const json& json_data) {
+    std::vector<Entry> revenue;
+    std::vector<Entry> expenses;
+
+    if (json_data.count("revenue") > 0) {
+        for (const auto& entry : json_data["revenue"]) {
+            double amount = entry.value("amount", 0.0);
+            std::string timestamp_str = entry.value("timestamp", "");
+            std::tm tm = {};
+            std::istringstream ss(timestamp_str);
+            ss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%S");
+            std::time_t timestamp = std::mktime(&tm);
+            revenue.push_back({ amount, timestamp });
+        }
+    }
+
+    if (json_data.count("expenses") > 0) {
+        for (const auto& entry : json_data["expenses"]) {
+            double amount = entry.value("amount", 0.0);
+            std::string timestamp_str = entry.value("timestamp", "");
+            std::tm tm = {};
+            std::istringstream ss(timestamp_str);
+            ss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%S");
+            std::time_t timestamp = std::mktime(&tm);
+            expenses.push_back({ amount, timestamp });
+        }
+    }
+
+    // Create a map to store the balances for each month
+    std::map<std::string, double> balance_sheet;
+    for (const auto& entry : revenue) {
+        std::tm* tm = std::localtime(&entry.timestamp);
+        std::string month = std::to_string(tm->tm_year + 1900) + "-" + std::to_string(tm->tm_mon + 1);
+        balance_sheet[month] += entry.amount;
+    }
+    for (const auto& entry : expenses) {
+        std::tm* tm = std::localtime(&entry.timestamp);
+        std::string month = std::to_string(tm->tm_year + 1900) + "-" + std::to_string(tm->tm_mon + 1);
+        balance_sheet[month] -= entry.amount;
+    }
+
+    std::vector<std::pair<std::string, double>> sorted_balance_sheet(balance_sheet.begin(), balance_sheet.end());
+    std::sort(sorted_balance_sheet.begin(), sorted_balance_sheet.end());
+
+    for (const auto& entry : sorted_balance_sheet) {
+        std::cout << entry.first << ": " << entry.second << std::endl;
+    }
+}
+
+int main() {
+    std::ifstream file("input.json");
+    json json_data;
+    file >> json_data;
+
+    generate_balance_sheet(json_data);
+
+    return 0;
+}
+
